@@ -1,8 +1,6 @@
 from datetime import datetime
 from pytz import timezone
 
-completed_reports = set()
-
 class TimezoneConverter:
     def __init__(self, source_timezone, target_timezone):
         self.source_timezone = timezone(source_timezone)

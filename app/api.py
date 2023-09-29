@@ -12,42 +12,49 @@ def teardown_db(error):
 
 app.teardown_appcontext(teardown_db)
 
-# Initialize a set to keep track of completed reports
-completed_reports = set()
-
 @app.route('/trigger_report', methods=['POST'])
 def trigger_report():
     global database_initialized
 
     if not Config.DATA_LOADED_FLAG:
-        db = get_db()  # Initialize the database within a request context
+        db = get_db()  
         db.create_tables()
         db.load_data_from_csvs()
         Config.DATA_LOADED_FLAG = True 
 
-    report_generator = ReportGenerator(get_db())  # Initialize report generator within a request context
-    report_id = ''.join(random.choices('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ', k=10))
-    # Start report generation process (to be implemented)
-    report_generator.generate_report()  # Trigger report generation
-    # Mark the report as complete
-    mark_report_as_complete(completed_reports, report_id)
+    report_generator = ReportGenerator(get_db()) 
 
-    return jsonify({'report_id': report_id})
+    report_generator.generate_report()  
+    
+    completed_reports = ReportGenerator.get_completed_reports()
+
+    return jsonify({'status': 'All reports generated.', 'completed_reports': list(completed_reports)})
 
 @app.route('/get_report', methods=['GET'])
 def get_report():
     report_id = request.args.get('report_id')
 
-    # Check if report generation is complete
+    # Get the set of completed reports
+    completed_reports = ReportGenerator.get_completed_reports()
+
     if report_id in completed_reports:
         file_path = f'reports/report_{report_id}.csv'
-        return send_file(file_path, as_attachment=True)
+
+        with open(file_path, 'r') as file:
+            content = file.read()
+
+            lines = content.split('\n')
+            headers = lines[0].split(',')
+            data = lines[1].split(',')
+
+            report_content = {}
+
+            for header, value in zip(headers, data):
+                report_content[header] = value
+
+            return jsonify({'status': 'Complete', 'report_content': report_content})
     else:
         return jsonify({'status': 'Running'})
-
-# Assume this function is called when report generation is complete
-def mark_report_as_complete(report_id):
-    completed_reports.add(report_id)
 
 if __name__ == '__main__':
     app.run(debug=True)
